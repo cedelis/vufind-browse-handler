@@ -16,6 +16,9 @@ public class Leech
     private String field;
     private Normalizer normalizer;
 
+    // optional field used to filter results from the complete index, e.g., location, institution
+    // we will prepend the value of this field to the sort_key (un-normalized) of our headings
+    // so that later we can sort and filter our results based on a particular value for this field
     protected String prependFromField = null;
 
     TermsEnum tenum = null;

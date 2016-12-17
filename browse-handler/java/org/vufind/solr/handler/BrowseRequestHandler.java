@@ -98,10 +98,11 @@ class HeadingsDB
     Connection db;
     String path;
     long dbVersion;
-    int totalCount;
     Normalizer normalizer;
 
     ReentrantReadWriteLock dbLock = new ReentrantReadWriteLock ();
+
+    Map<String,Integer> totalCounts = new HashMap<String,Integer> ();
 
     public HeadingsDB (String path) throws Exception
     {
@@ -129,19 +130,34 @@ class HeadingsDB
         db = DriverManager.getConnection ("jdbc:sqlite:" + path);
         db.setAutoCommit (false);
         dbVersion = currentVersion ();
+    }
 
-        PreparedStatement countStmnt = db.prepareStatement (
-            "select count(1) as count from headings");
+    private int getTotalCount(String prependFromValue) throws Exception {
+        String cacheKey = prependFromValue == null ? "" : prependFromValue;
+        if (totalCounts.containsKey(cacheKey)) {
+           return totalCounts.get(cacheKey).intValue();
+        }
+
+        String sql = "select count(1) as count from headings";
+        if (prependFromValue != null) {
+           sql += " where key like '" + prependFromValue + "_%'";
+        }
+        PreparedStatement countStmnt = db.prepareStatement (sql);
 
         ResultSet rs = countStmnt.executeQuery ();
         rs.next ();
-
-        totalCount = rs.getInt ("count");
-
+        int totalCount = rs.getInt ("count");
         rs.close ();
         countStmnt.close ();
-    }
 
+        if (prependFromValue != null) {
+            int begRowID = getHeadingStart ("", prependFromValue, true);
+            totalCount += begRowID;
+        }
+
+        totalCounts.put(cacheKey, new Integer(totalCount));
+        return totalCount;
+    }
 
     private long currentVersion ()
     {
@@ -192,6 +208,11 @@ class HeadingsDB
 
     public int getHeadingStart (String from, String prependFromValue) throws Exception
     {
+        return getHeadingStart (from, prependFromValue, false);
+    }
+
+    public int getHeadingStart (String from, String prependFromValue, boolean failOnNotFound) throws Exception
+    {
         PreparedStatement rowStmnt = db.prepareStatement (
             "select rowid from headings " +
             "where key >= ? " +
@@ -209,7 +230,6 @@ class HeadingsDB
         } else {
             prepended_normalized_sort_key = normalizer.normalize (from);
         }
-        //rowStmnt.setBytes (1, normalizer.normalize (from));
         rowStmnt.setBytes (1, prepended_normalized_sort_key);
 
         ResultSet rs = rowStmnt.executeQuery ();
@@ -217,13 +237,17 @@ class HeadingsDB
         if (rs.next ()) {
             return rs.getInt ("rowid");
         } else {
-            return totalCount + 1;   // past the end
+            if (failOnNotFound) {
+                return 0;
+            }
+            return getTotalCount(prependFromValue) + 1;   // past the end
         }
     }
 
 
     public HeadingSlice getHeadings (int rowid,
-                                     int rows)
+                                     int rows,
+                                     String prependFromValue)
         throws Exception
     {
         HeadingSlice result = new HeadingSlice ();
@@ -262,7 +286,7 @@ class HeadingsDB
         rs.close ();
         rowStmnt.close ();
 
-        result.total = Math.max(0, (totalCount - rowid) + 1);
+        result.total = Math.max(0, (getTotalCount(prependFromValue) - rowid) + 1);
 
         return result;
     }
@@ -468,18 +492,19 @@ class BibDB
                     try {
                         Document doc = db.getIndexReader ().document (docid);
 
-if (prependFromField != null) {
-    String[] pfv = doc.getValues(prependFromField);
-    int j=0;
-    for (; j < pfv.length; j++) {
-        if (pfv[j].equals(prependFromValue)) {
-            break;
-        }
-    }
-    if (j == pfv.length) {
-        return;
-    }
-}
+                        // Filter out documents we don't want
+                        if (prependFromField != null) {
+                            String[] pfv = doc.getValues(prependFromField);
+                            int j=0;
+                            for (; j < pfv.length; j++) {
+                                if (pfv[j].equals(prependFromValue)) {
+                                    break;
+                                }
+                            }
+                            if (j == pfv.length) {
+                                return;
+                            }
+                        }
 
                         String[] vals = doc.getValues ("id");
 			Collection<String> id = new HashSet<String> ();
@@ -653,7 +678,7 @@ class Browse
         BrowseList result = new BrowseList ();
 
         HeadingSlice h = headingsDB.getHeadings (Math.max (1, rowid + offset),
-                                                 rows);
+                                                 rows, prependFromValue);
 
         result.totalCount = h.total;
 
@@ -859,8 +884,8 @@ public class BrowseRequestHandler extends RequestHandlerBase
         SolrParams p = req.getParams ();
 
         String sourceName = p.get ("source");
-String prependFromField = p.get ("prependFromField");
-String prependFromValue = p.get ("prependFromValue");
+        String prependFromField = p.get ("prependFromField");
+        String prependFromValue = p.get ("prependFromValue");
         String from = p.get ("from");
         String extras = p.get ("extras");
 

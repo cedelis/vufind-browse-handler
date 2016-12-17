@@ -38,6 +38,8 @@ public class StoredFieldLeech extends Leech
         fieldSelection.add(sortField);
         fieldSelection.add(valueField);
         fieldSelection.add("id");   // make Solr id available for error messages
+
+        // optional field used to filter results from the complete index, e.g., location, institution
         if (this.prependFromField != null) {
             fieldSelection.add(prependFromField);
         }
@@ -52,6 +54,9 @@ public class StoredFieldLeech extends Leech
     {
         Document doc = reader.document (currentDoc, fieldSelection);
 
+        // optional field used to filter results from the complete index, e.g., location, institution
+        // we will prepend the value of this field to the sort_key (un-normalized) of our headings
+        // so that later we can sort and filter our results based on a particular value for this field
         String prependFromValue = "";
         if (this.prependFromField != null) {
             String[] prependValues = doc.getValues (this.prependFromField);
@@ -66,7 +71,7 @@ public class StoredFieldLeech extends Leech
         if (sort_key.length == value.length) {
             for (int i = 0; i < value.length; i++) {
                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                outputStream.write(prependFromValue.getBytes());
+                outputStream.write(prependFromValue.getBytes()); // can be empty if this.prependField is null; that's okay
                 outputStream.write(buildSortKey(sort_key[i]));
                 byte prepended_normalized_sort_key[] = outputStream.toByteArray();
                 buffer.add (new BrowseEntry(prepended_normalized_sort_key,
