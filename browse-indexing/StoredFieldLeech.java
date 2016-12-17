@@ -21,9 +21,9 @@ public class StoredFieldLeech extends Leech
     private Set<String> fieldSelection;
 
 
-    public StoredFieldLeech (String indexPath, String field) throws Exception
+    public StoredFieldLeech (String indexPath, String field, String prependFromField) throws Exception
     {
-        super (indexPath, field);
+        super (indexPath, field, prependFromField);
 
         sortField = Utils.getEnvironment ("SORTFIELD");
         valueField = Utils.getEnvironment ("VALUEFIELD");
@@ -38,6 +38,9 @@ public class StoredFieldLeech extends Leech
         fieldSelection.add(sortField);
         fieldSelection.add(valueField);
         fieldSelection.add("id");   // make Solr id available for error messages
+        if (this.prependFromField != null) {
+            fieldSelection.add(prependFromField);
+        }
 
         reader = DirectoryReader.open (FSDirectory.open (new File (indexPath).toPath ()));
         buffer = new LinkedList<BrowseEntry> ();
@@ -49,12 +52,24 @@ public class StoredFieldLeech extends Leech
     {
         Document doc = reader.document (currentDoc, fieldSelection);
 
+        String prependFromValue = "";
+        if (this.prependFromField != null) {
+            String[] prependValues = doc.getValues (this.prependFromField);
+            if (prependValues.length > 0) {
+                prependFromValue = prependValues[0];
+            }
+            prependFromValue += "_"; // always need to add this delimiter
+        }
         String[] sort_key = doc.getValues (sortField);
         String[] value = doc.getValues (valueField);
 
         if (sort_key.length == value.length) {
             for (int i = 0; i < value.length; i++) {
-                buffer.add (new BrowseEntry(buildSortKey(sort_key[i]),
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                outputStream.write(prependFromValue.getBytes());
+                outputStream.write(buildSortKey(sort_key[i]));
+                byte prepended_normalized_sort_key[] = outputStream.toByteArray();
+                buffer.add (new BrowseEntry(prepended_normalized_sort_key,
                                             sort_key[i],
                                             value[i]));
             }

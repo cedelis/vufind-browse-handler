@@ -117,7 +117,6 @@ class HeadingsDB
         normalizer = NormalizerFactory.getNormalizer (normalizerClassName);
     }
 
-
     private void openDB () throws Exception
     {
         if (!new File (path).exists()) {
@@ -191,7 +190,7 @@ class HeadingsDB
     }
 
 
-    public int getHeadingStart (String from) throws Exception
+    public int getHeadingStart (String from, String prependFromValue) throws Exception
     {
         PreparedStatement rowStmnt = db.prepareStatement (
             "select rowid from headings " +
@@ -199,7 +198,19 @@ class HeadingsDB
             "order by key " +
             "limit 1");
 
-        rowStmnt.setBytes (1, normalizer.normalize (from));
+
+        byte[] prepended_normalized_sort_key = null;
+        if (prependFromValue != null) {
+            String pfv = prependFromValue + "_"; // always add this delimeter (just like we indexed it)
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            outputStream.write(pfv.getBytes());
+            outputStream.write(normalizer.normalize (from));
+            prepended_normalized_sort_key = outputStream.toByteArray();
+        } else {
+            prepended_normalized_sort_key = normalizer.normalize (from);
+        }
+        //rowStmnt.setBytes (1, normalizer.normalize (from));
+        rowStmnt.setBytes (1, prepended_normalized_sort_key);
 
         ResultSet rs = rowStmnt.executeQuery ();
 
@@ -418,7 +429,7 @@ class BibDB
      *                 for use in the browse display
      * @return         return a map of Solr ids and extra bib info
      */
-    public Map<String, List<Collection<String>>> matchingIDs (String heading, String extras)
+    public Map<String, List<Collection<String>>> matchingIDs (String heading, String extras, final String prependFromField, final String prependFromValue)
         throws Exception
     {
         TermQuery q = new TermQuery (new Term (field, heading));
@@ -456,6 +467,19 @@ class BibDB
                     int docid = docnum + context.docBase;
                     try {
                         Document doc = db.getIndexReader ().document (docid);
+
+if (prependFromField != null) {
+    String[] pfv = doc.getValues(prependFromField);
+    int j=0;
+    for (; j < pfv.length; j++) {
+        if (pfv[j].equals(prependFromValue)) {
+            break;
+        }
+    }
+    if (j == pfv.length) {
+        return;
+    }
+}
 
                         String[] vals = doc.getValues ("id");
 			Collection<String> id = new HashSet<String> ();
@@ -587,9 +611,9 @@ class Browse
     }
 
 
-    private void populateItem (BrowseItem item, String extras) throws Exception
+    private void populateItem (BrowseItem item, String extras, String prependFromField, String prependFromValue) throws Exception
     {
-        Map<String, List<Collection<String>>> bibinfo = bibDB.matchingIDs (item.heading, extras);
+        Map<String, List<Collection<String>>> bibinfo = bibDB.matchingIDs (item.heading, extras, prependFromField, prependFromValue);
         //item.ids = bibinfo.get ("ids");
 	item.setIds (bibinfo.get ("ids"));
         bibinfo.remove ("ids");
@@ -617,13 +641,13 @@ class Browse
     }
 
 
-    public int getId (String from) throws Exception
+    public int getId (String from, String prependFromValue) throws Exception
     {
-        return headingsDB.getHeadingStart (from);
+        return headingsDB.getHeadingStart (from, prependFromValue);
     }
 
 
-    public BrowseList getList (int rowid, int offset, int rows, String extras)
+    public BrowseList getList (int rowid, int offset, int rows, String extras, String prependFromField, String prependFromValue)
         throws Exception
     {
         BrowseList result = new BrowseList ();
@@ -639,7 +663,7 @@ class Browse
 
             BrowseItem item = new BrowseItem (sort_key, heading);
 
-            populateItem (item, extras);
+            populateItem (item, extras, prependFromField, prependFromValue);
 
             result.items.add (item);
         }
@@ -835,6 +859,8 @@ public class BrowseRequestHandler extends RequestHandlerBase
         SolrParams p = req.getParams ();
 
         String sourceName = p.get ("source");
+String prependFromField = p.get ("prependFromField");
+String prependFromValue = p.get ("prependFromValue");
         String from = p.get ("from");
         String extras = p.get ("extras");
 
@@ -894,13 +920,13 @@ public class BrowseRequestHandler extends RequestHandlerBase
                 source.browse.reopenDatabasesIfUpdated ();
 
                 if (from != null) {
-                    rowid = (source.browse.getId (from));
+                    rowid = (source.browse.getId (from, prependFromValue));
                 }
 
 
                 Log.info ("Browsing from: " + rowid);
 
-                BrowseList list = source.browse.getList (rowid, offset, rows, extras);
+                BrowseList list = source.browse.getList (rowid, offset, rows, extras, prependFromField, prependFromValue);
 
                 Map<String,Object> result = new HashMap<String, Object> ();
 

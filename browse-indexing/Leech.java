@@ -16,16 +16,19 @@ public class Leech
     private String field;
     private Normalizer normalizer;
 
+    protected String prependFromField = null;
+
     TermsEnum tenum = null;
 
 
     public Leech (String indexPath,
-                  String field) throws Exception
+                  String field,
+                  String prependFromField) throws Exception
     {
         reader = DirectoryReader.open (FSDirectory.open (new File (indexPath).toPath ()));
         searcher = new IndexSearcher (reader);
         this.field = field;
-
+        this.prependFromField = prependFromField;
 
         String normalizerClass = System.getProperty("browse.normalizer");
         normalizer = NormalizerFactory.getNormalizer(normalizerClass);

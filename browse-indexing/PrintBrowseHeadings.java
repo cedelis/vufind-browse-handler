@@ -66,6 +66,14 @@ public class PrintBrowseHeadings
                            KEY_SEPARATOR +
                            new String (Base64.encodeBase64 (heading.getBytes(Charset.forName("UTF-8")))) +
                            RECORD_SEPARATOR);
+///*****
+System.out.print (new String (sort_key) +
+"\t" +
+new String (key_text.getBytes(Charset.forName("UTF-8"))) +
+"\t" +
+new String (heading.getBytes(Charset.forName("UTF-8"))) +
+"\n");
+//*****/
             }
         }
     }
@@ -132,7 +140,7 @@ public class PrintBrowseHeadings
     }
 
 
-    private Leech getBibLeech (String bibPath, String luceneField)
+    private Leech getBibLeech (String bibPath, String luceneField, String prependFromField)
         throws Exception
     {
         String leechClass = "Leech";
@@ -142,8 +150,8 @@ public class PrintBrowseHeadings
         }
 
         return (Leech) (Class.forName (leechClass)
-                        .getConstructor (String.class, String.class)
-                        .newInstance (bibPath, luceneField ));
+                        .getConstructor (String.class, String.class, String.class)
+                        .newInstance (bibPath, luceneField, prependFromField ));
     }
 
 
@@ -153,7 +161,12 @@ public class PrintBrowseHeadings
                         String outFile)
         throws Exception
     {
-        bibLeech = getBibLeech (bibPath, luceneField);
+        String prependFromField = null;
+        if (getEnvironment ("PREPENDFROMFIELD") != null) {
+            prependFromField = getEnvironment ("PREPENDFROMFIELD");
+        }
+
+        bibLeech = getBibLeech (bibPath, luceneField, prependFromField);
         this.luceneField = luceneField;
 
         IndexReader bibReader = DirectoryReader.open (FSDirectory.open (new File (bibPath).toPath ()));
@@ -164,7 +177,8 @@ public class PrintBrowseHeadings
         if (authPath != null) {
             nonprefAuthLeech = new Leech (authPath,
                                           System.getProperty ("field.insteadof",
-                                                              "insteadOf"));
+                                                              "insteadOf"),
+                                          prependFromField);
 
             IndexReader authReader = DirectoryReader.open (FSDirectory.open (new File (authPath).toPath ()));
             authSearcher = new IndexSearcher (authReader);
