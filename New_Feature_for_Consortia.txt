@@ -1,0 +1,81 @@
+VuFind browse Solr extension (https://github.com/vufind-org/vufind-browse-handler)
+==================================================================================
+
+Problem: I currently have a single Solr index for a consortium of
+libraries (instead of separate Solr index for each library). In this
+scenario, Alphabrowse combines all of the libraries’ data together
+into a single Alphabrowse index. This is not acceptable since
+individual libraries are only interested in searching their own data.
+
+Solution: I decided to simply prepend the header sort field with the
+library’s name (with an ‘_’ appended). This allows us to easily
+search a single library’s data.
+
+I created a new feature for “browse-indexing” and “browse-handler”
+to accommodate this solution:
+
+CAVEATS:
+
+(*) This solution is only applicable when using the StoredFieldLeech
+(-Dbibleech=StoredFieldLeech) because the indexer needs to have access
+to the header sort field's value in order to modify it correctly.
+
+(*) Using StoredFieldLeech assumes that you have the sort field stored
+in Solr, e.g., <field name="topic_browse" type="string" indexed="true"
+stored="true" multiValued="true"/>
+
+
+New “browse-indexing” feature
+=============================
+
+This feature can be enabled by setting a definition variable on the
+command-line:
+
+    -DprependFromField <filterByField>
+
+Example:
+
+    -DprependFromField institution
+
+For an institution named "LibraryA", this will result in an Authorbrowse
+index with records that begin like this:
+
+    LibraryA_This is a Title
+
+instead of this:
+
+    This is a Title
+
+
+Here are a few java command-line examples:
+
+title example:
+
+    java -Xms1G -Xmx1G -Dprependfromfield=institution -Dbibleech=StoredFieldLeech -Dsortfield=title_sort -Dvaluefield=title_fullStr -Dfile.encoding=UTF-8 -Dfield.preferred=heading -Dfield.insteadof=use_for -cp <classpath> PrintBrowseHeadings ./solr/vufind/biblio/index title_fullStr title.tmp
+
+topic example:
+
+    java -Xms1G -Xmx1G -Dprependfromfield=institution -Dbibleech=StoredFieldLeech -Dsortfield=topic_browse -Dvaluefield=topic_browse -Dfile.encoding=UTF-8 -Dfield.preferred=heading -Dfield.insteadof=use_for -cp <classpath> PrintBrowseHeadings ./solr/vufind/biblio/index topic_browse ./solr/vufind/authority/index topic.tmp
+
+author example:
+
+    java -Xms1G -Xmx1G -Dprependfromfield=institution -Dbibleech=StoredFieldLeech -Dsortfield=author_browse -Dvaluefield=author_browse -Dfile.encoding=UTF-8 -Dfield.preferred=heading -Dfield.insteadof=use_for -cp <classpath> PrintBrowseHeadings ./solr/vufind/biblio/index author_browse ./solr/vufind/authority/index author.tmp
+
+lcc example:
+
+    java -Xss512m -Xms1G -Xmx1G -Dprependfromfield=institution -Dbrowse.normalizer=org.vufind.util.LCCallNormalizer -Dbibleech=StoredFieldLeech -Dsortfield=callnumber-raw -Dvaluefield=callnumber-raw -Dfile.encoding=UTF-8 -Dfield.preferred=heading -Dfield.insteadof=use_for -cp <classpath> PrintBrowseHeadings ./solr/vufind/biblio/index callnumber-raw lcc.tmp
+
+
+
+New “browse-handling” feature
+=============================
+
+Once you have set up your Alphabrowse index (above), you may now
+search a particular library's data by adding two additional parameters,
+prependFromField and prependFromValue, to the Solr query.
+
+Example:
+
+    http://yourhost.example.com:8080/solr/browse?source=subjects&from=boats&rows=20&prependFromField=institution&prependFromValue=LibraryA
+
+
