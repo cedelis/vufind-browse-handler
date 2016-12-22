@@ -24,6 +24,9 @@ to the header sort field's value in order to modify it correctly.
 in Solr, e.g., <field name="topic_browse" type="string" indexed="true"
 stored="true" multiValued="true"/>
 
+(*) The prependFromField (see below) must NOT be multiValued, i.e.,
+it will not be able to handle fields such as "format"
+
 
 New “browse-indexing” feature
 =============================
