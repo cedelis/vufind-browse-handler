@@ -99,6 +99,7 @@ class HeadingsDB
     String path;
     long dbVersion;
     Normalizer normalizer;
+    static String FROM_FIELD_DELIMITER = "_";
 
     ReentrantReadWriteLock dbLock = new ReentrantReadWriteLock ();
 
@@ -140,7 +141,7 @@ class HeadingsDB
 
         String sql = "select count(1) as count from headings";
         if (prependFromValue != null) {
-           sql += " where key like '" + prependFromValue + "_%'";
+           sql += " where key like '" + prependFromValue + FROM_FIELD_DELIMITER + "%'";
         }
         PreparedStatement countStmnt = db.prepareStatement (sql);
 
@@ -222,7 +223,7 @@ class HeadingsDB
 
         byte[] prepended_normalized_sort_key = null;
         if (prependFromValue != null) {
-            String pfv = prependFromValue + "_"; // always add this delimeter (just like we indexed it)
+            String pfv = prependFromValue + FROM_FIELD_DELIMITER; // always add this delimeter (just like we indexed it)
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             outputStream.write(pfv.getBytes());
             outputStream.write(normalizer.normalize (from));

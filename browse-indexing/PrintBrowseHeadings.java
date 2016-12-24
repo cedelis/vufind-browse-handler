@@ -66,14 +66,6 @@ public class PrintBrowseHeadings
                            KEY_SEPARATOR +
                            new String (Base64.encodeBase64 (heading.getBytes(Charset.forName("UTF-8")))) +
                            RECORD_SEPARATOR);
-/*****
-System.out.print (new String (sort_key) +
-"\t" +
-new String (key_text.getBytes(Charset.forName("UTF-8"))) +
-"\t" +
-new String (heading.getBytes(Charset.forName("UTF-8"))) +
-"\n");
-*****/
             }
         }
     }

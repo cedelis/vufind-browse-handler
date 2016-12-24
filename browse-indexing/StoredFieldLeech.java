@@ -63,7 +63,7 @@ public class StoredFieldLeech extends Leech
             if (prependValues.length > 0) {
                 prependFromValue = prependValues[0];
             }
-            prependFromValue += "_"; // always need to add this delimiter
+            prependFromValue += FROM_FIELD_DELIMITER; // always need to add this delimiter
         }
         String[] sort_key = doc.getValues (sortField);
         String[] value = doc.getValues (valueField);

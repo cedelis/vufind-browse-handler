@@ -20,6 +20,7 @@ public class Leech
     // we will prepend the value of this field to the sort_key (un-normalized) of our headings
     // so that later we can sort and filter our results based on a particular value for this field
     protected String prependFromField = null;
+    static String FROM_FIELD_DELIMITER = "_"; // delimeter to be used after prependFromFieldValue and sort key, e.g., LibraryA_sortfield
 
     TermsEnum tenum = null;
 
